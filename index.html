@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wake County Property & AMI Explorer</title>
+    <meta name="description"
+        content="Interactive mapping tool to analyze development patterns in Wake County by comparing property values to local incomes.">
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+           CSS DESIGN SYSTEM
+        ═══════════════════════════════════════════════════════════════ */
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d28;
+            --bg-tertiary: #252836;
+            --bg-hover: #2e3245;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0b0;
+            --text-muted: #6b7280;
+            --accent-blue: #60a5fa;
+            --accent-green: #34d399;
+            --accent-amber: #fbbf24;
+            --accent-rose: #fb7185;
+            --accent-purple: #a78bfa;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(15, 17, 23, 0.88);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+            --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ── Map Container ───────────────────────────────────────────── */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+        }
+
+        /* ── Header Bar ──────────────────────────────────────────────── */
+        .header-bar {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 10px 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+        }
+
+        .header-title span {
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        /* ── Control Panel ───────────────────────────────────────────── */
+        .control-panel {
+            position: absolute;
+            top: 80px;
+            left: 16px;
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            width: 280px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .panel-section {
+            margin-bottom: 20px;
+        }
+
+        .panel-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .panel-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        /* View Mode Buttons */
+        .view-modes {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .view-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: left;
+        }
+
+        .view-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .view-btn.active {
+            background: rgba(96, 165, 250, 0.12);
+            border-color: rgba(96, 165, 250, 0.3);
+            color: var(--accent-blue);
+        }
+
+        .view-btn .btn-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .view-btn.active .btn-icon {
+            background: rgba(96, 165, 250, 0.15);
+        }
+
+        .btn-label small {
+            display: block;
+            font-size: 10px;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .view-btn.active .btn-label small {
+            color: rgba(96, 165, 250, 0.7);
+        }
+
+        /* ── Legend ──────────────────────────────────────────────────── */
+        .legend-bar {
+            display: flex;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* ── Stats Cards ─────────────────────────────────────────────── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* ── Info Panel (click popup) ─────────────────────────────── */
+        .info-panel {
+            position: absolute;
+            top: 80px;
+            right: 16px;
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 0;
+            width: 320px;
+            box-shadow: var(--shadow-lg);
+            display: none;
+            overflow: hidden;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .info-panel.visible {
+            display: block;
+        }
+
+        .info-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .info-tract-id {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-tract-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .info-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: var(--bg-hover);
+            border: none;
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+
+        .info-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .info-classification {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .classification-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .info-metrics {
+            padding: 16px 20px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* ── VTI Bar ─────────────────────────────────────────────────── */
+        .vti-bar-container {
+            padding: 0 20px 16px;
+        }
+
+        .vti-bar-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .vti-bar-track {
+            height: 8px;
+            background: var(--bg-hover);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .vti-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ── Loading Overlay ─────────────────────────────────────────── */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2000;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* ── Leaflet Overrides ────────────────────────────────────────── */
+        .leaflet-container {
+            background: var(--bg-primary) !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        .leaflet-control-zoom {
+            border: none !important;
+            box-shadow: var(--shadow-md) !important;
+        }
+
+        .leaflet-control-zoom a {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--glass-border) !important;
+            width: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            font-size: 18px !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background: var(--bg-hover) !important;
+        }
+
+        .leaflet-control-zoom-in {
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
+        }
+
+        .leaflet-control-zoom-out {
+            border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+            border-top: none !important;
+        }
+
+        /* ── Tooltip (hover) ─────────────────────────────────────────── */
+        .tract-tooltip {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--glass-border) !important;
+            border-radius: var(--radius-sm) !important;
+            padding: 8px 12px !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 12px !important;
+            box-shadow: var(--shadow-md) !important;
+        }
+
+        .tract-tooltip .tooltip-name {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .tract-tooltip .tooltip-metric {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .tract-tooltip .tooltip-metric strong {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .leaflet-tooltip-top:before,
+        .leaflet-tooltip-bottom:before,
+        .leaflet-tooltip-left:before,
+        .leaflet-tooltip-right:before {
+            border: none !important;
+        }
+
+        /* ── Responsive ──────────────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .header-bar {
+                left: 16px;
+                right: 16px;
+                transform: none;
+                justify-content: center;
+            }
+
+            .control-panel {
+                top: auto;
+                bottom: 16px;
+                left: 16px;
+                right: 16px;
+                width: auto;
+            }
+
+            .info-panel {
+                top: auto;
+                bottom: 16px;
+                left: 16px;
+                right: 16px;
+                width: auto;
+            }
+
+            .view-modes {
+                flex-direction: row;
+            }
+
+            .view-btn {
+                flex: 1;
+                justify-content: center;
+                padding: 8px;
+            }
+
+            .btn-label small {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Wake County data…</div>
+    </div>
+
+    <!-- Header -->
+    <div class="header-bar">
+        <div class="header-logo">🏘️</div>
+        <div class="header-title">Wake County <span>Property & AMI Explorer</span></div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel" id="controlPanel">
+        <div class="panel-section">
+            <div class="panel-label">Viewing Mode</div>
+            <div class="view-modes">
+                <button class="view-btn active" data-mode="vti" id="btnVTI">
+                    <div class="btn-icon">📊</div>
+                    <div class="btn-label">
+                        Value-to-Income
+                        <small>Property value ÷ AMI</small>
+                    </div>
+                </button>
+                <button class="view-btn" data-mode="blight" id="btnBlight">
+                    <div class="btn-icon">⚠️</div>
+                    <div class="btn-label">
+                        Blight Risk
+                        <small>Land ratio indicator</small>
+                    </div>
+                </button>
+                <button class="view-btn" data-mode="age" id="btnAge">
+                    <div class="btn-icon">🏗️</div>
+                    <div class="btn-label">
+                        Housing Age
+                        <small>Average year built</small>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="panel-label" id="legendTitle">VTI Ratio Legend</div>
+            <div class="legend-bar" id="legendBar"></div>
+            <div class="legend-labels" id="legendLabels"></div>
+        </div>
+
+        <div class="panel-section">
+            <div class="panel-label">County Overview</div>
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-value" id="statTracts">—</div>
+                    <div class="stat-label">Census Tracts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statMedianAMI">—</div>
+                    <div class="stat-label">Median AMI</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statAvgVTI">—</div>
+                    <div class="stat-label">Avg VTI Ratio</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statBlightTracts">—</div>
+                    <div class="stat-label">Blight Risk Tracts</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Panel (appears on click) -->
+    <div class="info-panel" id="infoPanel">
+        <div class="info-header">
+            <div>
+                <div class="info-tract-id" id="infoTractId">GEOID</div>
+                <div class="info-tract-name" id="infoTractName">Census Tract</div>
+            </div>
+            <button class="info-close" id="infoClose">✕</button>
+        </div>
+        <div class="info-classification">
+            <div class="classification-badge" id="infoBadge">—</div>
+        </div>
+        <div class="info-metrics" id="infoMetrics"></div>
+        <div class="vti-bar-container">
+            <div class="vti-bar-label">VTI Position</div>
+            <div class="vti-bar-track">
+                <div class="vti-bar-fill" id="vtiBarFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  Configuration
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CONFIG = {
+    center: [35.78, -78.64],
+    zoom: 11,
+    minZoom: 9,
+    maxZoom: 17,
+    tileUrl: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    tileAttribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    labelUrl: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+};
+
+// Color Scales — refined palettes for each mode
+const SCALES = {
+    vti: {
+        // Blue-Purple gradient: low investment → high development
+        stops: [
+            { val: 0,  color: '#1e1b4b' },
+            { val: 2,  color: '#be185d' },
+            { val: 4,  color: '#f97316' },
+            { val: 6,  color: '#facc15' },
+            { val: 10, color: '#34d399' },
+            { val: 20, color: '#60a5fa' },
+            { val: 55, color: '#818cf8' },
+        ],
+        legend: { title: 'Value-to-Income Ratio', min: 'Low (< 2)', max: 'High (> 20)' },
+    },
+    blight: {
+        // Green → Yellow → Red (risk scale)
+        stops: [
+            { val: 0,   color: '#059669' },
+            { val: 0.2, color: '#34d399' },
+            { val: 0.4, color: '#fbbf24' },
+            { val: 0.6, color: '#f97316' },
+            { val: 0.8, color: '#ef4444' },
+            { val: 1.0, color: '#991b1b' },
+        ],
+        legend: { title: 'Blight Risk (Land Ratio)', min: 'Low Risk', max: 'High Risk' },
+    },
+    age: {
+        // Warm → Cool: old → new
+        stops: [
+            { val: 1920, color: '#991b1b' },
+            { val: 1950, color: '#f97316' },
+            { val: 1970, color: '#fbbf24' },
+            { val: 1990, color: '#34d399' },
+            { val: 2005, color: '#60a5fa' },
+            { val: 2025, color: '#818cf8' },
+        ],
+        legend: { title: 'Average Year Built', min: '< 1950', max: '> 2005' },
+    },
+};
+
+// Classifications
+function classify(props) {
+    const vti = props.vti_ratio;
+    const lr = props.land_ratio;
+    if (vti == null && lr == null) return { label: 'No Data', color: '#4b5563', icon: '○' };
+    if (lr != null && lr > 0.6) return { label: 'Blight Risk', color: '#ef4444', icon: '⚠' };
+    if (vti == null) return { label: 'No VTI Data', color: '#6b7280', icon: '○' };
+    if (vti > 10) return { label: 'Premium/High Dev', color: '#60a5fa', icon: '◆' };
+    if (vti > 6) return { label: 'Developed', color: '#34d399', icon: '●' };
+    if (vti > 3) return { label: 'Moderate', color: '#fbbf24', icon: '●' };
+    if (vti > 1.5) return { label: 'Undervalued', color: '#f97316', icon: '▼' };
+    return { label: 'Stagnant', color: '#ef4444', icon: '▼' };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Map Initialization
+// ═══════════════════════════════════════════════════════════════════════════
+
+const map = L.map('map', {
+    center: CONFIG.center,
+    zoom: CONFIG.zoom,
+    minZoom: CONFIG.minZoom,
+    maxZoom: CONFIG.maxZoom,
+    zoomControl: false,
+    attributionControl: true,
+});
+
+// Zoom control in bottom-right
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Dark basemap tiles
+L.tileLayer(CONFIG.tileUrl, {
+    attribution: CONFIG.tileAttribution,
+    subdomains: 'abcd',
+    maxZoom: 19,
+}).addTo(map);
+
+// Create a non-interactive pane for labels so they don't block clicks
+const labelsPane = map.createPane('labelsPane');
+labelsPane.style.zIndex = 650;
+labelsPane.style.pointerEvents = 'none';
+
+// Labels on top (non-interactive)
+const labelLayer = L.tileLayer(CONFIG.labelUrl, {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    pane: 'labelsPane',
+});
+labelLayer.addTo(map);
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════════════════
+
+let currentMode = 'vti';
+let geojsonLayer = null;
+let geojsonData = null;
+let selectedLayer = null;
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Color Interpolation
+// ═══════════════════════════════════════════════════════════════════════════
+
+function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+}
+
+function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => Math.round(x).toString(16).padStart(2, '0')).join('');
+}
+
+function getColor(value, mode) {
+    if (value == null || isNaN(value)) return '#1f2937';
+
+    const stops = SCALES[mode].stops;
+    if (value <= stops[0].val) return stops[0].color;
+    if (value >= stops[stops.length - 1].val) return stops[stops.length - 1].color;
+
+    for (let i = 0; i < stops.length - 1; i++) {
+        if (value >= stops[i].val && value <= stops[i + 1].val) {
+            const t = (value - stops[i].val) / (stops[i + 1].val - stops[i].val);
+            const c1 = hexToRgb(stops[i].color);
+            const c2 = hexToRgb(stops[i + 1].color);
+            return rgbToHex(
+                c1[0] + t * (c2[0] - c1[0]),
+                c1[1] + t * (c2[1] - c1[1]),
+                c1[2] + t * (c2[2] - c1[2]),
+            );
+        }
+    }
+    return stops[stops.length - 1].color;
+}
+
+function getMetricValue(props, mode) {
+    switch (mode) {
+        case 'vti': return props.vti_ratio;
+        case 'blight': return props.land_ratio;
+        case 'age': return props.avg_year;
+        default: return null;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Layer Styling
+// ═══════════════════════════════════════════════════════════════════════════
+
+function styleFeature(feature) {
+    const val = getMetricValue(feature.properties, currentMode);
+    const color = getColor(val, currentMode);
+    return {
+        fillColor: color,
+        fillOpacity: 0.75,
+        color: 'rgba(255,255,255,0.15)',
+        weight: 1,
+        opacity: 1,
+    };
+}
+
+function highlightStyle() {
+    return {
+        weight: 2.5,
+        color: '#ffffff',
+        fillOpacity: 0.9,
+    };
+}
+
+function selectedStyle() {
+    return {
+        weight: 3,
+        color: '#60a5fa',
+        fillOpacity: 0.9,
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Formatting Helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+function fmtCurrency(val) {
+    if (val == null || isNaN(val)) return '—';
+    return '$' + Math.round(val).toLocaleString();
+}
+
+function fmtNumber(val, decimals = 1) {
+    if (val == null || isNaN(val)) return '—';
+    return Number(val).toFixed(decimals);
+}
+
+function fmtYear(val) {
+    if (val == null || isNaN(val) || val < 1800) return '—';
+    return Math.round(val).toString();
+}
+
+function fmtPercent(val) {
+    if (val == null || isNaN(val)) return '—';
+    return (val * 100).toFixed(1) + '%';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Tooltip & Click Interactions
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getTooltipContent(props) {
+    const val = getMetricValue(props, currentMode);
+    let metricLabel, metricVal;
+    switch (currentMode) {
+        case 'vti':
+            metricLabel = 'VTI Ratio';
+            metricVal = fmtNumber(val, 2);
+            break;
+        case 'blight':
+            metricLabel = 'Land Ratio';
+            metricVal = fmtPercent(val);
+            break;
+        case 'age':
+            metricLabel = 'Avg Year Built';
+            metricVal = fmtYear(val);
+            break;
+    }
+
+    return `<div class="tooltip-name">${props.NAMELSAD || 'Tract ' + props.GEOID}</div>
+            <div class="tooltip-metric">${metricLabel}: <strong>${metricVal}</strong></div>`;
+}
+
+function showInfoPanel(props) {
+    const panel = document.getElementById('infoPanel');
+    const cls = classify(props);
+
+    document.getElementById('infoTractId').textContent = 'GEOID: ' + (props.GEOID || '—');
+    document.getElementById('infoTractName').textContent = props.NAMELSAD || 'Census Tract';
+
+    const badge = document.getElementById('infoBadge');
+    badge.textContent = cls.icon + ' ' + cls.label;
+    badge.style.background = cls.color + '22';
+    badge.style.color = cls.color;
+
+    const metrics = document.getElementById('infoMetrics');
+    metrics.innerHTML = `
+        <div class="metric-row">
+            <span class="metric-label">Avg Property Value</span>
+            <span class="metric-value">${fmtCurrency(props.avg_val)}</span>
+        </div>
+        <div class="metric-row">
+            <span class="metric-label">Area Median Income</span>
+            <span class="metric-value">${fmtCurrency(props.ami)}</span>
+        </div>
+        <div class="metric-row">
+            <span class="metric-label">VTI Ratio</span>
+            <span class="metric-value">${fmtNumber(props.vti_ratio, 2)}</span>
+        </div>
+        <div class="metric-row">
+            <span class="metric-label">Land Ratio</span>
+            <span class="metric-value">${fmtPercent(props.land_ratio)}</span>
+        </div>
+        <div class="metric-row">
+            <span class="metric-label">Avg Year Built</span>
+            <span class="metric-value">${fmtYear(props.avg_year)}</span>
+        </div>
+    `;
+
+    // VTI bar
+    const vtiBar = document.getElementById('vtiBarFill');
+    const vti = props.vti_ratio;
+    if (vti != null && !isNaN(vti)) {
+        const pct = Math.min(100, Math.max(0, (vti / 20) * 100));
+        vtiBar.style.width = pct + '%';
+        vtiBar.style.background = `linear-gradient(90deg, ${getColor(vti * 0.3, 'vti')}, ${getColor(vti, 'vti')})`;
+    } else {
+        vtiBar.style.width = '0%';
+    }
+
+    panel.classList.add('visible');
+}
+
+function hideInfoPanel() {
+    document.getElementById('infoPanel').classList.remove('visible');
+    if (selectedLayer) {
+        geojsonLayer.resetStyle(selectedLayer);
+        selectedLayer = null;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Legend
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateLegend() {
+    const scale = SCALES[currentMode];
+    const bar = document.getElementById('legendBar');
+    const labels = document.getElementById('legendLabels');
+    const title = document.getElementById('legendTitle');
+
+    title.textContent = scale.legend.title;
+
+    // Build gradient bar
+    const colors = scale.stops.map(s => s.color);
+    bar.style.background = `linear-gradient(90deg, ${colors.join(', ')})`;
+    bar.innerHTML = '';
+
+    labels.innerHTML = `<span>${scale.legend.min}</span><span>${scale.legend.max}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Stats
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateStats(data) {
+    const features = data.features;
+    const props = features.map(f => f.properties);
+
+    const total = features.length;
+    const amis = props.filter(p => p.ami != null).map(p => p.ami).sort((a, b) => a - b);
+    const vtis = props.filter(p => p.vti_ratio != null).map(p => p.vti_ratio);
+    const blightCount = props.filter(p => p.land_ratio != null && p.land_ratio > 0.6).length;
+
+    document.getElementById('statTracts').textContent = total;
+    document.getElementById('statMedianAMI').textContent = amis.length > 0
+        ? fmtCurrency(amis[Math.floor(amis.length / 2)])
+        : '—';
+    document.getElementById('statAvgVTI').textContent = vtis.length > 0
+        ? fmtNumber(vtis.reduce((a, b) => a + b, 0) / vtis.length, 1) + '×'
+        : '—';
+    document.getElementById('statBlightTracts').textContent = blightCount;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GeoJSON Layer
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initGeoJSON(data) {
+    geojsonData = data;
+
+    geojsonLayer = L.geoJSON(data, {
+        style: styleFeature,
+        onEachFeature: function (feature, layer) {
+            // Tooltip on hover
+            layer.bindTooltip(() => getTooltipContent(feature.properties), {
+                sticky: true,
+                className: 'tract-tooltip',
+                direction: 'top',
+                offset: [0, -10],
+            });
+
+            // Hover highlight
+            layer.on('mouseover', function () {
+                if (selectedLayer !== layer) {
+                    layer.setStyle(highlightStyle());
+                    layer.bringToFront();
+                    if (selectedLayer) selectedLayer.bringToFront();
+                }
+            });
+            layer.on('mouseout', function () {
+                if (selectedLayer !== layer) {
+                    geojsonLayer.resetStyle(layer);
+                }
+            });
+
+            // Click to select
+            layer.on('click', function () {
+                if (selectedLayer) {
+                    geojsonLayer.resetStyle(selectedLayer);
+                }
+                selectedLayer = layer;
+                layer.setStyle(selectedStyle());
+                layer.bringToFront();
+                showInfoPanel(feature.properties);
+            });
+        },
+    }).addTo(map);
+
+    // Bring labels to front
+    labelLayer.bringToFront();
+}
+
+function refreshStyles() {
+    if (geojsonLayer) {
+        geojsonLayer.eachLayer(layer => {
+            const style = styleFeature(layer.feature);
+            layer.setStyle(style);
+            if (selectedLayer === layer) {
+                layer.setStyle(selectedStyle());
+            }
+        });
+    }
+    updateLegend();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  View Mode Toggle
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        refreshStyles();
+    });
+});
+
+// Close info panel
+document.getElementById('infoClose').addEventListener('click', hideInfoPanel);
+
+// Close panel on Escape
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hideInfoPanel();
+});
+
+// Close panel on map click (empty area)
+map.on('click', function (e) {
+    // Only hide if clicking on the map background, not a feature
+    // This is handled by the layer click above
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Load Data
+// ═══════════════════════════════════════════════════════════════════════════
+
+fetch('wake_master.geojson')
+    .then(res => {
+        if (!res.ok) throw new Error('Failed to load data file');
+        return res.json();
+    })
+    .then(data => {
+        initGeoJSON(data);
+        updateStats(data);
+        updateLegend();
+
+        // Hide loading screen
+        setTimeout(() => {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }, 400);
+    })
+    .catch(err => {
+        console.error('Error loading data:', err);
+        document.querySelector('.loading-text').textContent =
+            'Error loading data. Make sure wake_master.geojson is in the same folder.';
+        document.querySelector('.loading-spinner').style.display = 'none';
+    });
+    </script>
+</body>
+
+</html>
